@@ -6,30 +6,33 @@
 
 ## 功能
 
-✅ 本插件已嵌入原始 Surge 脚本的 protobuf 引擎，可直接处理 YouTube API 的二进制响应。
-
 | 功能 | 说明 |
 |------|------|
-| 拦截 `googlevideo initplayback` 广告请求 | 返回 200 空响应 |
-| protobuf 去广告 | 完整处理 YouTube API 二进制 protobuf 响应，删除广告字段 |
-| 移除上传/Shorts/选段按钮 | 从侧栏导航中移除 FEuploads / FEshorts / FEmusic_immersive |
-| 移除 Shorts shelf | 从推荐流和搜索结果中移除 Shorts 容器 |
-| 移除 reel overlay 广告 | 清除 Shorts 中的覆盖层广告 |
-| 启用画中画 / 后台播放 | 在 player 响应中注入相关字段 |
-| 歌词翻译 | 调用 Google Translate 翻译歌词 |
-| 字幕翻译 | 在播放器中注入翻译字幕轨道 |
-| 后台播放设置 | 在设置页注入后台播放开关 |
+| URL 级别广告请求拦截 | 拦截 `googlevideo initplayback`、`doubleclick`、`googlesyndication` 等广告域名 |
+| protobuf 广告字段删除 | 内置 Surge 脚本 protobuf 引擎，处理 YouTube API 响应 |
+| 移除按钮 | 移除侧栏的上传/Shorts/选段按钮 |
+| 移除 Shorts shelf / reel 覆盖广告 | 清除 feeds 和 Shorts 中的广告 |
+| 画中画 / 后台播放 | 在 player 响应中注入相关字段 |
+| 歌词/字幕翻译 | 调用 Google Translate |
 
-## 使用方式
+## 使用方法
 
-1. 打开 Anywhere
-2. 导入 `youtube_enhance_anywhere.amrs`
-3. 确保 MITM 已启用并信任根证书
-4. 测试 YouTube / YouTube Music
+1. 导入 → 启用 MITM → 信任证书 → 测试
 
-## 实现原理
+## 关于 QUIC 协议
 
-- 插件嵌入了原始 Surge 脚本的完整 protobuf 运行时和 YouTube 消息定义
-- 通过 Anywhere 适配层（shim）将 Surge API 映射为 Anywhere 原生 API
-- 首次调用时初始化 Surge 兼容层，之后每次请求直接在适配环境上处理
-- init 会打印 `[YT]` 日志，可在 Anywhere 日志中查看是否正常加载
+YouTube 可能通过 QUIC (UDP) 协议投递广告，而 MITM 只拦截 TCP 连接，QUIC 流量会绕过 MITM。原 Surge 模块也包含了 QUIC 拦截规则：
+
+```
+AND,((DOMAIN-SUFFIX,googlevideo.com),(PROTOCOL,QUIC)),REJECT
+AND,((DOMAIN-SUFFIX,youtubei.googleapis.com),(PROTOCOL,QUIC)),REJECT
+```
+
+如果你在 Anywhere 中设置了路由策略来拦截 QUIC，广告拦截会更彻底。
+
+## 调试
+
+导入本插件后，在 Anywhere 日志中搜索 `[YT]` 可以看到初始化状态和每次请求的处理情况：
+- 看到 `[YT] init OK` 表示引擎加载成功
+- 看到 `[YT] processed X -> Y bytes` 表示脚本实际改写了响应体
+- 没有日志则说明规则可能没匹配到
